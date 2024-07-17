@@ -24,6 +24,10 @@ Develop an AI model to identify 5-7 common African medicinal plants with high ac
 5. Lantana camara L. - Mbarambati
 6. Citrus limon (L.) Burm. f. - Mulemoni
 7. Mangifera indica L. - Mumango
+8. Annona stenophylla Engl. & Diels - Muroro
+9. Moringa oleifera Lour - Moringa
+10. Aloe barbadensis - Gavakava
+11. Ricinus communis L. - Mupfuta
 
 ## Technology Stack
 
