@@ -1,6 +1,7 @@
-Flask==2.0.1
-gunicorn==20.1.0
-tensorflow==2.5.0
+tensorflow>=2.13.0
 Pillow==8.2.0
-twilio==6.59.0
-requests==2.25.1
+Flask>=2.0.1
+gunicorn>=20.1.0
+Pillow>=8.2.0
+twilio>=6.59.0
+requests>=2.25.1
