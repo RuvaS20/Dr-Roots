@@ -2,14 +2,26 @@ import os
 import json
 import numpy as np
 from flask import Flask, request, jsonify
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
+import tflite_runtime.interpreter as tflite
+from PIL import Image
+import io
+
+# from tensorflow.keras.models import load_model
+# from tensorflow.keras.preprocessing.image import load_img, img_to_array
+
 from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
-# Load the model and class mapping
-model = load_model('medicinal_plant_model.h5')
+# model = load_model('medicinal_plant_model.h5')
+# Load TFLite model and allocate tensors
+interpreter = tflite.Interpreter(model_path="model.tflite")
+interpreter.allocate_tensors()
+# Get input and output tensors
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+# Load class mapping
 with open('class_mapping.json', 'r') as f:
     idx_to_class = json.load(f)
 
@@ -45,11 +57,17 @@ plant_info = {
     }
 }
 
+# def preprocess_image(image_path):
+#     img = load_img(image_path, target_size=(224, 224))
+#     img_array = img_to_array(img)
+#     img_array = np.expand_dims(img_array, axis=0)
+#     img_array /= 255.0
+#     return img_array
+
 def preprocess_image(image_path):
-    img = load_img(image_path, target_size=(224, 224))
-    img_array = img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array /= 255.0
+    img = Image.open(image_path).resize((224, 224))
+    img_array = np.array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0).astype(np.float32)
     return img_array
 
 @app.route('/webhook', methods=['POST'])
@@ -68,9 +86,17 @@ def webhook():
         with open(image_path, 'wb') as handler:
             handler.write(image_data)
 
+        # # Preprocess and predict
+        # img_array = preprocess_image(image_path)
+        # prediction = model.predict(img_array)
+        # predicted_class = idx_to_class[str(np.argmax(prediction[0]))]
         # Preprocess and predict
         img_array = preprocess_image(image_path)
-        prediction = model.predict(img_array)
+        
+        interpreter.set_tensor(input_details[0]['index'], img_array)
+        interpreter.invoke()
+        prediction = interpreter.get_tensor(output_details[0]['index'])
+        
         predicted_class = idx_to_class[str(np.argmax(prediction[0]))]
 
         # Get plant information
