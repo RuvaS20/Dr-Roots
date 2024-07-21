@@ -56,8 +56,8 @@ def augment_images(input_folder, output_folder, num_augmentations_per_image=5):
                 cv2.imwrite(output_path, cv2.cvtColor(augmented_image, cv2.COLOR_RGB2BGR))
 
 # Usage
-input_folder = r"C:\Users\Ruvarashe\Desktop\Alumna Changemaker\Offiicial Selected Dataset\Citrus Limon\Test"
-output_folder = r"C:\Users\Ruvarashe\Desktop\Alumna Changemaker\Offiicial Selected Dataset\Citrus Limon\Validation"
+input_folder = r"FILEPATH"
+output_folder = r"FILEPATH"
 num_augmentations_per_image = 3
 
 print(f"Augmenting images from: {input_folder}")

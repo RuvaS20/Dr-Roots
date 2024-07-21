@@ -23,8 +23,8 @@ def resize_images(input_folder, output_folder, size=(224, 224)):
                 print(f"Resized {filename} to 224x224")
 
 # Usage
-input_folder = r"C:\Users\Ruvarashe\Desktop\Alumna Changemaker\Offiicial Selected Dataset\Zingiber Test Remove"
-output_folder = r"C:\Users\Ruvarashe\Desktop\Alumna Changemaker\Offiicial Selected Dataset\Zingiber Test Resized"
+input_folder = r"FILEPATH"
+output_folder = r"FILEPATH"
 
 print(f"Resizing images from: {input_folder}")
 print(f"Saving resized images to: {output_folder}")
