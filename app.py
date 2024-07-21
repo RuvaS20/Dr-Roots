@@ -2,7 +2,10 @@ import os
 import json
 import numpy as np
 from flask import Flask, request, jsonify
-import tflite_runtime.interpreter as tflite
+try:
+    import tflite_runtime.interpreter as tflite
+except ImportError:
+    import tensorflow.lite as tflite
 from PIL import Image
 import io
 
