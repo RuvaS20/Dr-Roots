@@ -9,17 +9,14 @@ except ImportError:
 from PIL import Image
 import io
 
-# from tensorflow.keras.models import load_model
-# from tensorflow.keras.preprocessing.image import load_img, img_to_array
-
 from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
-# model = load_model('medicinal_plant_model.h5')
 # Load TFLite model and allocate tensors
 interpreter = tflite.Interpreter(model_path="model.tflite")
 interpreter.allocate_tensors()
+
 # Get input and output tensors
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
@@ -60,18 +57,16 @@ plant_info = {
     }
 }
 
-# def preprocess_image(image_path):
-#     img = load_img(image_path, target_size=(224, 224))
-#     img_array = img_to_array(img)
-#     img_array = np.expand_dims(img_array, axis=0)
-#     img_array /= 255.0
-#     return img_array
-
 def preprocess_image(image_path):
     img = Image.open(image_path).resize((224, 224))
     img_array = np.array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=0).astype(np.float32)
     return img_array
+
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -79,43 +74,62 @@ def webhook():
     resp = MessagingResponse()
     msg = resp.message()
 
-    if request.values.get('NumMedia') != '0':
-        image_url = request.values.get('MediaUrl0')
-        image_path = 'temp_image.jpg'
-        
-        # Download and save the image
-        import requests
-        image_data = requests.get(image_url).content
-        with open(image_path, 'wb') as handler:
-            handler.write(image_data)
+    # Check if it's the first message (you might need to implement a way to track this)
+    if incoming_msg == 'hi' or incoming_msg == 'hello':
+        welcome_message = (
+            "Welcome to Doctor Roots! 🌿\n\n"
+            "I'm here to help you identify medicinal plants and provide information about their uses. "
+            "Simply send me a clear photo of a plant, and I'll do my best to identify it.\n\n"
+            "Disclaimer: This bot is for educational purposes only. Always consult with a qualified healthcare "
+            "professional before using any plant for medicinal purposes. Do not rely solely on this information "
+            "for medical advice."
+        )
+        msg.body(welcome_message)
 
-        # # Preprocess and predict
-        # img_array = preprocess_image(image_path)
-        # prediction = model.predict(img_array)
-        # predicted_class = idx_to_class[str(np.argmax(prediction[0]))]
-        # Preprocess and predict
-        img_array = preprocess_image(image_path)
-        
-        interpreter.set_tensor(input_details[0]['index'], img_array)
-        interpreter.invoke()
-        prediction = interpreter.get_tensor(output_details[0]['index'])
-        
-        predicted_class = idx_to_class[str(np.argmax(prediction[0]))]
+    elif request.values.get('NumMedia') != '0':
+        try:
+            image_url = request.values.get('MediaUrl0')
+            logging.info(f"Received image URL: {image_url}")
 
-        # Get plant information
-        plant_data = plant_info.get(predicted_class, {})
-        shona_name = plant_data.get('shona_name', 'Unknown')
-        uses = plant_data.get('uses', 'Information not available.')
+            image_path = 'temp_image.jpg'
+            
+            # Download and save the image
+            import requests
+            image_data = requests.get(image_url).content
+            with open(image_path, 'wb') as handler:
+                handler.write(image_data)
+            logging.info("Image saved successfully")
 
-        # Construct response
-        response = f"The plant appears to be {predicted_class}.\n"
-        response += f"Shona name: {shona_name}\n"
-        response += f"Medicinal uses: {uses}\n\n"
-        response += "Would you like to know more about this plant?"
+            # Preprocess and predict
+            img_array = preprocess_image(image_path)
+            logging.info("Image preprocessed successfully")
 
-        msg.body(response)
+            interpreter.set_tensor(input_details[0]['index'], img_array)
+            interpreter.invoke()
+            prediction = interpreter.get_tensor(output_details[0]['index'])
+            logging.info("Prediction made successfully")
+
+            predicted_class = idx_to_class[str(np.argmax(prediction[0]))]
+            logging.info(f"Predicted class: {predicted_class}")
+
+            # Get plant information
+            plant_data = plant_info.get(predicted_class, {})
+            shona_name = plant_data.get('shona_name', 'Unknown')
+            uses = plant_data.get('uses', 'Information not available.')
+
+            # Construct response
+            response = f"The plant appears to be {predicted_class}.\n"
+            response += f"Shona name: {shona_name}\n"
+            response += f"Medicinal uses: {uses}\n\n"
+            response += "Would you like to know more about this plant?"
+
+            msg.body(response)
+        except Exception as e:
+            logging.error(f"Error processing image: {str(e)}")
+            msg.body("Sorry, there was an error processing your image. Please try again.")
+            
     else:
-        msg.body("Please send an image of a medicinal plant.")
+        msg.body("Please send an image of a medicinal plant or type 'hi' for information.")
 
     return str(resp)
 
