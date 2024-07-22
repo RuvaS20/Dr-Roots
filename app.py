@@ -14,7 +14,17 @@ from twilio.twiml.messaging_response import MessagingResponse
 app = Flask(__name__)
 
 # Load TFLite model and allocate tensors
-interpreter = tflite.Interpreter(model_path="model.tflite")
+import os
+
+# Get the directory of the current script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Construct the full path to the model file
+model_path = os.path.join(current_dir, "model.tflite")
+
+# Use the full path when initializing the interpreter
+interpreter = tflite.Interpreter(model_path=model_path)
+
 interpreter.allocate_tensors()
 
 # Get input and output tensors
@@ -22,7 +32,8 @@ input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
 # Load class mapping
-with open('class_mapping.json', 'r') as f:
+class_mapping_path = os.path.join(current_dir, "class_mapping.json")
+with open(class_mapping_path, 'r') as f:
     idx_to_class = json.load(f)
 
 # Plant information dictionary
@@ -127,7 +138,7 @@ def webhook():
         except Exception as e:
             logging.error(f"Error processing image: {str(e)}")
             msg.body("Sorry, there was an error processing your image. Please try again.")
-            
+
     else:
         msg.body("Please send an image of a medicinal plant or type 'hi' for information.")
 
