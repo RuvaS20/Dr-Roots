@@ -4,4 +4,4 @@ Pillow>=8.2.0
 twilio>=6.59.0
 requests>=2.25.1
 numpy==1.21.0
-tflite-runtime==2.5.0
+tflite-runtime>=2.13.0
