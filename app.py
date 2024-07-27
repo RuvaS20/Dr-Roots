@@ -1,6 +1,7 @@
 import os
 import json
 from flask import Flask, request
+from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
 import tensorflow as tf
 import numpy as np
@@ -21,6 +22,13 @@ with open('class_mapping.json', 'r') as f:
 # Load the plant information
 with open('plant_data.json', 'r', encoding='utf-8') as f:
     plant_info = json.load(f)
+
+# Get Twilio credentials from environment variables
+TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
+TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
+
+client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 def predict_image(image):
     # Preprocess the image
@@ -50,6 +58,15 @@ def get_plant_info(plant_name, info_type):
         if plant['Common Name'].lower() == plant_name.lower() or plant['Shona Name'].lower() == plant_name.lower():
             return plant.get(info_type, "Information not available")
     return "Plant not found in database"
+
+def send_sms(to, body):
+    """Send an SMS using Twilio."""
+    message = client.messages.create(
+        body=body,
+        from_=TWILIO_PHONE_NUMBER,
+        to=to
+    )
+    return message.sid
 
 @app.route('/')
 def home():
