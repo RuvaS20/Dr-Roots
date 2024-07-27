@@ -1,148 +1,118 @@
 import os
 import json
+from flask import Flask, request
+from twilio.twiml.messaging_response import MessagingResponse
+import tensorflow as tf
 import numpy as np
-from flask import Flask, request, jsonify
-try:
-    import tflite_runtime.interpreter as tflite
-except ImportError:
-    import tensorflow.lite as tflite
 from PIL import Image
 import io
-
-from twilio.twiml.messaging_response import MessagingResponse
+import requests
 
 app = Flask(__name__)
 
-# Load TFLite model and allocate tensors
-import os
-
-# Get the directory of the current script
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Construct the full path to the model file
-model_path = os.path.join(current_dir, "model.tflite")
-
-# Use the full path when initializing the interpreter
-interpreter = tflite.Interpreter(model_path=model_path)
-
+# Load the TFLite model
+interpreter = tf.lite.Interpreter(model_path="dr_roots_model.tflite")
 interpreter.allocate_tensors()
 
-# Get input and output tensors
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+# Load the class mapping
+with open('class_mapping.json', 'r') as f:
+    class_mapping = json.load(f)
 
-# Load class mapping
-class_mapping_path = os.path.join(current_dir, "class_mapping.json")
-with open(class_mapping_path, 'r') as f:
-    idx_to_class = json.load(f)
+# Load the plant information
+with open('plant_data.json', 'r', encoding='utf-8') as f:
+    plant_info = json.load(f)
 
-# Plant information dictionary
-plant_info = {
-    "Catharanthus roseus": {
-        "shona_name": "Chirindamatongo",
-        "uses": "Used to treat diabetes, high blood pressure, and certain cancers."
-    },
-    "Psidium guajava": {
-        "shona_name": "Mugwavha",
-        "uses": "Used to treat diarrhea, dysentery, and digestive problems."
-    },
-    "Zingiber officinale": {
-        "shona_name": "Tsangamidzi",
-        "uses": "Used to treat nausea, colds, and arthritis."
-    },
-    "Citrus limon": {
-        "shona_name": "Mulemoni",
-        "uses": "Used for vitamin C, improving digestion, and boosting immunity."
-    },
-    "Mangifera indica": {
-        "shona_name": "Mumango",
-        "uses": "Used to treat digestive issues, boost immunity, and improve skin health."
-    },
-    "Moringa oleifera": {
-        "shona_name": "Moringa",
-        "uses": "Used as a nutritional supplement and to treat inflammation."
-    },
-    "Aloe barbadensis": {
-        "shona_name": "Gavakava",
-        "uses": "Used for skin conditions, burns, and digestive health."
-    }
-}
+def predict_image(image):
+    # Preprocess the image
+    image = image.resize((224, 224))
+    image_array = np.array(image) / 255.0
+    image_array = np.expand_dims(image_array, axis=0).astype(np.float32)
 
-def preprocess_image(image_path):
-    img = Image.open(image_path).resize((224, 224))
-    img_array = np.array(img) / 255.0
-    img_array = np.expand_dims(img_array, axis=0).astype(np.float32)
-    return img_array
+    # Set the input tensor
+    input_details = interpreter.get_input_details()
+    interpreter.set_tensor(input_details[0]['index'], image_array)
 
-import logging
+    # Run inference
+    interpreter.invoke()
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+    # Get the output tensor
+    output_details = interpreter.get_output_details()
+    output_data = interpreter.get_tensor(output_details[0]['index'])
 
-@app.route('/webhook', methods=['POST'])
+    # Get the predicted class and confidence
+    predicted_class = np.argmax(output_data)
+    confidence = output_data[0][predicted_class]
+
+    return predicted_class, confidence
+
+def get_plant_info(plant_name, info_type):
+    for plant in plant_info:
+        if plant['Common Name'].lower() == plant_name.lower() or plant['Shona Name'].lower() == plant_name.lower():
+            return plant.get(info_type, "Information not available")
+    return "Plant not found in database"
+
+@app.route('/')
+def home():
+    return "Hello, Flask is running!"
+
+@app.route("/webhook", methods=["POST"])
 def webhook():
     incoming_msg = request.values.get('Body', '').lower()
     resp = MessagingResponse()
     msg = resp.message()
 
-    # Check if it's the first message (you might need to implement a way to track this)
-    if incoming_msg == 'hi' or incoming_msg == 'hello':
-        welcome_message = (
-            "Welcome to Doctor Roots! 🌿\n\n"
-            "I'm here to help you identify medicinal plants and provide information about their uses. "
-            "Simply send me a clear photo of a plant, and I'll do my best to identify it.\n\n"
-            "Disclaimer: This bot is for educational purposes only. Always consult with a qualified healthcare "
-            "professional before using any plant for medicinal purposes. Do not rely solely on this information "
-            "for medical advice."
-        )
-        msg.body(welcome_message)
+    if request.values.get('NumMedia') != '0':
+        # Handle image
+        image_url = request.values.get('MediaUrl0')
+        if image_url is None:
+            msg.body("Sorry, I couldn't find the image you sent. Please try sending it again.")
+        else:
+            try:
+                image_data = requests.get(image_url).content
+                image = Image.open(io.BytesIO(image_data))
+                
+                predicted_class, confidence = predict_image(image)
+                
+                if confidence > 0.5:
+                    plant_name = class_mapping[str(predicted_class)]
+                    msg.body(f"I predict this is {plant_name} with {confidence*100:.2f}% confidence.")
+                else:
+                    msg.body("I'm not confident enough to identify this plant. Please try another image.")
+            except requests.exceptions.RequestException as e:
+                msg.body("Sorry, I had trouble downloading the image. Please try sending it again.")
+            except Exception as e:
+                msg.body("Sorry, there was an error processing your image. Please try again.")
 
-    elif request.values.get('NumMedia') != '0':
-        try:
-            image_url = request.values.get('MediaUrl0')
-            logging.info(f"Received image URL: {image_url}")
+    elif incoming_msg.startswith('uses:'):
+        plant_name = incoming_msg.split(':', 1)[1].strip()
+        info = get_plant_info(plant_name, 'Reported Medicinal Uses')
+        msg.body(f"Medicinal uses of {plant_name}: {info}")
 
-            image_path = 'temp_image.jpg'
-            
-            # Download and save the image
-            import requests
-            image_data = requests.get(image_url).content
-            with open(image_path, 'wb') as handler:
-                handler.write(image_data)
-            logging.info("Image saved successfully")
+    elif incoming_msg.startswith('description:'):
+        plant_name = incoming_msg.split(':', 1)[1].strip()
+        info = get_plant_info(plant_name, 'Physical Description')
+        msg.body(f"Description of {plant_name}: {info}")
 
-            # Preprocess and predict
-            img_array = preprocess_image(image_path)
-            logging.info("Image preprocessed successfully")
+    elif incoming_msg.startswith('safety:'):
+        plant_name = incoming_msg.split(':', 1)[1].strip()
+        info = get_plant_info(plant_name, 'Safety Precautions')
+        msg.body(f"Safety precautions for {plant_name}: {info}")
 
-            interpreter.set_tensor(input_details[0]['index'], img_array)
-            interpreter.invoke()
-            prediction = interpreter.get_tensor(output_details[0]['index'])
-            logging.info("Prediction made successfully")
-
-            predicted_class = idx_to_class[str(np.argmax(prediction[0]))]
-            logging.info(f"Predicted class: {predicted_class}")
-
-            # Get plant information
-            plant_data = plant_info.get(predicted_class, {})
-            shona_name = plant_data.get('shona_name', 'Unknown')
-            uses = plant_data.get('uses', 'Information not available.')
-
-            # Construct response
-            response = f"The plant appears to be {predicted_class}.\n"
-            response += f"Shona name: {shona_name}\n"
-            response += f"Medicinal uses: {uses}\n\n"
-            response += "Would you like to know more about this plant?"
-
-            msg.body(response)
-        except Exception as e:
-            logging.error(f"Error processing image: {str(e)}")
-            msg.body("Sorry, there was an error processing your image. Please try again.")
+    elif incoming_msg.startswith('preparation:'):
+        plant_name = incoming_msg.split(':', 1)[1].strip()
+        info = get_plant_info(plant_name, 'Preparation Methods & Parts Used')
+        msg.body(f"Preparation methods for {plant_name}: {info}")
 
     else:
-        msg.body("Please send an image of a medicinal plant or type 'hi' for information.")
+        msg.body("Welcome to Dr. Roots! You can:\n"
+                 "1. Send an image for plant identification\n"
+                 "2. Ask about a plant using these commands:\n"
+                 "   - uses: [plant name]\n"
+                 "   - description: [plant name]\n"
+                 "   - safety: [plant name]\n"
+                 "   - preparation: [plant name]")
 
     return str(resp)
 
-if __name__ == '__main__':
-    app.run()
+if __name__ == "__main__":
+    app.run(debug=True)
