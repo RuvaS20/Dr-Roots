@@ -1,0 +1,16 @@
+# Exclude test files
+tests/
+*.test.py
+
+# Exclude local development files
+.env
+*.db
+*.sqlite
+
+# Exclude documentation
+docs/
+*.md
+
+# Exclude other non-essential files
+*.git
+*.gitignore
