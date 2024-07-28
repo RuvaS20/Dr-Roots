@@ -5,6 +5,7 @@ from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
 import tensorflow as tf
 import numpy as np
+import PIL
 from PIL import Image
 import io
 import requests
