@@ -14,3 +14,6 @@ docs/
 # Exclude other non-essential files
 *.git
 *.gitignore
+
+# ignore environment variables file
+.end
