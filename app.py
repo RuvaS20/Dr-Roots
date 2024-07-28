@@ -97,13 +97,20 @@ def webhook():
     if incoming_msg in ['menu', 'start over']:
         user_states[from_number]['state'] = 'initial'
         msg.body("🌿 *Welcome to Doctor Roots!* 🌿 \n\nI'm your friendly medicinal plant bot.\n\n📸*Send me a clear photo of a plant - I'll try to identify it and share fun facts about it!*📸\n\nOr choose one of these options:\n1️⃣ Learn more about other plants\n2️⃣ Contact the developer\n\n🚨Important Disclaimer🚨\nThe information disseminated here is for educational purposes only and should not be taken as medical advice.")
+        return str(resp)
     elif incoming_msg in ['exit', 'end']:
         user_states.pop(from_number, None)
         msg.body("Thank you for trying out Doctor Roots! If you have any feedback or questions, feel free to reach out. Have a great day!")
-    elif user_states[from_number]['state'] == 'initial':
+        return str(resp)
+
+    if user_states[from_number]['state'] == 'initial':
         msg.body("🌿 *Welcome to Doctor Roots!* 🌿 \n\nI'm your friendly medicinal plant bot.\n\n📸*Send me a clear photo of a plant - I'll try to identify it and share fun facts about it!*📸\n\nOr choose one of these options:\n1️⃣ Learn more about other plants\n2️⃣ Contact the developer\n\n🚨Important Disclaimer🚨\nThe information disseminated here is for educational purposes only and should not be taken as medical advice.")
         user_states[from_number]['state'] = 'default'
     elif num_media > 0:
+        if user_states[from_number]['state'] == 'initial':
+            msg.body("Please send a text message first.")
+            return str(resp)
+
         media_url = request.values.get('MediaUrl0')
         
         if media_url:
