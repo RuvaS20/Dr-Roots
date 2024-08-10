@@ -4,6 +4,8 @@
 
 Doctor Roots is an AI-powered WhatsApp bot designed to accurately identify indigenous African medicinal plants and provide safe usage information. This project aims to bridge the gap between traditional herbal medicine and modern technology, ensuring safe and effective use of medicinal plants while promoting conservation. 🌍💚
 
+Website link: https://dashboard.heroku.com/apps/dr-roots/settings
+
 ## Objective
 
 Develop an AI model to identify 7 common African medicinal plants with high accuracy, and integrate this model into a WhatsApp bot for easy access by users. 🤖📲
