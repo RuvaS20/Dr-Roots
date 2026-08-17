@@ -1,2 +1,5 @@
 # ignore environment variables file
 .env
+
+# personal working notes
+TODO.md
